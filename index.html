@@ -150,7 +150,7 @@ function renderNew(){
   $app.innerHTML = `
     <h1>新しい日記</h1><p class="sub">期間は3日〜31日で選べます。</p>
     <form class="new" id="f">
-      <label>タイトル<input name="title" required maxlength="40" value="夏休みの一言日記"></label>
+      <label>タイトル<input name="title" required maxlength="40" value="一言日記"></label>
       <label>はじまる日<input name="start" type="date" required value="${today}"></label>
       <label>日数（3〜31日）<input name="days" type="number" min="3" max="31" required value="7"></label>
       <div class="actions"><button class="primary" type="submit">はじめる</button>
