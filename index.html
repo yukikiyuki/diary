@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta name="robots" content="noindex">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>一言日記</title>
@@ -39,8 +38,8 @@ button.danger{color:var(--margin);border-color:var(--margin)}
 .date{flex:0 0 56px;text-align:center;font-size:.78rem;line-height:1.2;color:var(--muted)}
 .date b{display:block;font-size:1.05rem;color:var(--ink)}
 .date.sun b{color:var(--margin)} .date.sat b{color:var(--blue)}
-.row input{flex:1;border:0;background:transparent;padding:10px 0 10px 14px;min-width:0}
-.row input::placeholder{color:var(--muted);opacity:.55}
+.row textarea{flex:1;border:0;background:transparent;padding:12px 0 12px 14px;min-width:0;resize:none;overflow:hidden;display:block;line-height:1.6;font:inherit;color:inherit;word-break:break-all}
+.row textarea::placeholder{color:var(--muted);opacity:.55}
 .row .txt{flex:1;padding:8px 0 8px 14px;word-break:break-all}
 .row.today{background:rgba(233,196,106,.22)}
 .bar{height:12px;border:2px solid var(--ink);border-radius:8px;background:var(--surface);overflow:hidden;margin:6px 0}
@@ -55,9 +54,9 @@ button.danger{color:var(--margin);border-color:var(--margin)}
 .folder h2{margin:0 0 6px}
 .folder .card{background:var(--paper)}
 .empty{color:var(--muted);padding:6px 2px}
-form.new{background:var(--surface);border:2px solid var(--ink);border-radius:10px;padding:14px;display:grid;gap:12px}
-form.new label{display:grid;gap:4px;font-size:.9rem}
-form.new input{border:2px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--paper)}
+.new{background:var(--surface);border:2px solid var(--ink);border-radius:10px;padding:14px;display:grid;gap:12px}
+.new label{display:grid;gap:4px;font-size:.9rem}
+.new input{border:2px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--paper)}
 .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:10px 18px;border-radius:24px;opacity:0;pointer-events:none;transition:opacity .25s;max-width:90%}
 .toast.on{opacity:1}
@@ -150,22 +149,24 @@ function renderNew(){
   const today = ymd(new Date());
   $app.innerHTML = `
     <h1>新しい日記</h1><p class="sub">期間は3日〜31日で選べます。</p>
-    <form class="new" id="f">
+    <div class="new" id="f">
       <label>タイトル<input name="title" required maxlength="40" value="一言日記"></label>
       <label>はじまる日<input name="start" type="date" required value="${today}"></label>
       <label>日数（3〜31日）<input name="days" type="number" min="3" max="31" required value="7"></label>
-      <div class="actions"><button class="primary" type="submit">はじめる</button>
+      <div class="actions"><button class="primary" type="button" id="go">はじめる</button>
       <button type="button" id="back">もどる</button></div>
-    </form>`;
+    </div>`;
   $app.querySelector("#back").onclick = ()=>go({name:"home"});
-  $app.querySelector("#f").onsubmit = e=>{
-    e.preventDefault();
-    const f = new FormData(e.target);
-    const days = Math.min(31, Math.max(3, parseInt(f.get("days"),10)||7));
-    const d = {id:"d"+Date.now().toString(36), title:f.get("title").trim()||"一言日記",
-      start:f.get("start"), days, entries:{}, done:false};
+  const start = ()=>{
+    const q = n=>$app.querySelector(`[name="${n}"]`).value;
+    const startDate = q("start") || ymd(new Date());
+    const days = Math.min(31, Math.max(3, parseInt(q("days"),10)||7));
+    const d = {id:"d"+Date.now().toString(36), title:q("title").trim()||"一言日記",
+      start:startDate, days, entries:{}, done:false};
     state.diaries.unshift(d); save(); go({name:"diary",id:d.id});
   };
+  $app.querySelector("#go").onclick = start;
+  $app.querySelectorAll(".new input").forEach(i=>i.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); start(); } }));
 }
 
 function renderDiary(){
@@ -180,7 +181,7 @@ function renderDiary(){
     rows += `<div class="row ${ymd(dt)===todayStr?"today":""}">
       <div class="date ${cls}"><b>${dt.getDate()}</b>${dt.getMonth()+1}月 ${WD[w]}</div>
       ${d.done ? `<div class="txt">${esc(val)}</div>`
-        : `<input data-i="${i}" maxlength="80" value="${esc(val)}" placeholder="今日のひとこと" aria-label="${dt.getMonth()+1}月${dt.getDate()}日のひとこと">`}
+        : `<textarea data-i="${i}" rows="1" maxlength="80" placeholder="今日のひとこと" aria-label="${dt.getMonth()+1}月${dt.getDate()}日のひとこと">${esc(val)}</textarea>`}
     </div>`;
   }
   $app.innerHTML = `
@@ -194,10 +195,14 @@ function renderDiary(){
       <button class="danger" id="del">この日記を削除</button>
     </div>`;
   $app.querySelector("#back").onclick = ()=>go({name:"home"});
-  $app.querySelector("#del").onclick = ()=>{
-    if(confirm("「"+d.title+"」を削除します。元にもどせません。")){
-      state.diaries = state.diaries.filter(x=>x!==d); save(); go({name:"home"});
+  const delBtn = $app.querySelector("#del");
+  delBtn.onclick = ()=>{
+    if(!delBtn.dataset.sure){
+      delBtn.dataset.sure = 1; delBtn.textContent = "本当に削除する（元にもどせません）";
+      setTimeout(()=>{ delBtn.dataset.sure=""; delBtn.textContent="この日記を削除"; }, 4000);
+      return;
     }
+    state.diaries = state.diaries.filter(x=>x!==d); save(); go({name:"home"});
   };
   if(d.done){
     $app.querySelector("#print").onclick = ()=>window.print();
@@ -210,9 +215,14 @@ function renderDiary(){
     $app.querySelector("#cnt").textContent = `${n} / ${d.days} うまった`;
   };
   upd();
-  $app.querySelectorAll("input[data-i]").forEach(inp=>{
+  const fit = el=>{ el.style.height="auto"; el.style.height=el.scrollHeight+"px"; };
+  const fitAll = ()=>$app.querySelectorAll("textarea[data-i]").forEach(fit);
+  fitAll();
+  window.onresize = fitAll;
+  $app.querySelectorAll("textarea[data-i]").forEach(inp=>{
     inp.addEventListener("input",()=>{
-      d.entries[inp.dataset.i] = inp.value; save(); upd();
+      if(/[\r\n]/.test(inp.value)) inp.value = inp.value.replace(/[\r\n]+/g," ");
+      fit(inp); d.entries[inp.dataset.i] = inp.value; save(); upd();
     });
     inp.addEventListener("change",()=>{
       if(filled(d)===d.days){
@@ -223,11 +233,11 @@ function renderDiary(){
     });
     inp.addEventListener("keydown",e=>{
       if(e.key==="Enter"){ e.preventDefault();
-        const next = $app.querySelector(`input[data-i="${+inp.dataset.i+1}"]`);
+        const next = $app.querySelector(`textarea[data-i="${+inp.dataset.i+1}"]`);
         inp.blur(); if(next) next.focus(); }
     });
   });
-  const first = [...$app.querySelectorAll("input[data-i]")].find(i=>!i.value.trim());
+  const first = [...$app.querySelectorAll("textarea[data-i]")].find(i=>!i.value.trim());
   if(first && !matchMedia("(pointer:coarse)").matches) first.focus();
 }
 
